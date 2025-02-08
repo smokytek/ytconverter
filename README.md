@@ -29,7 +29,7 @@ MP3 DL è uno script Python che permette di scaricare video da YouTube e convert
 
 1. **Esegui lo script**
    ```sh
-   python main.py
+   python bot.py
    ```
 2. **Inserisci l'URL** quando richiesto.
 3. Attendi il completamento del download e della conversione in MP3.
