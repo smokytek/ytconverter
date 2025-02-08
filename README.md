@@ -1,4 +1,4 @@
-# MP3 DL by Smokytek
+# MP3 DL
 
 MP3 DL è uno script Python che permette di scaricare video da YouTube e convertirli in MP3. Supporta sia il download di singoli video che di intere playlist.
 
