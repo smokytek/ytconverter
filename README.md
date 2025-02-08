@@ -6,8 +6,8 @@ MP3 DL è uno script Python che permette di scaricare video da YouTube e convert
 
 1. **Clona il repository**
    ```sh
-   git clone https://github.com/tuo-username/smokytek-mp3-downloader.git
-   cd smokytek-mp3-downloader
+   git clone https://github.com/smokytek/ytconverter.git
+   cd smokytek-ytconverter
    ```
 
 2. **Installa le dipendenze**
