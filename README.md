@@ -5,6 +5,7 @@ Applicazione desktop per Windows che scarica una singola traccia audio e la conv
 ## Funzionalità
 
 - interfaccia grafica Tkinter;
+- download di singoli video o playlist complete;
 - qualità MP3 selezionabile da 96 a 320 kbps;
 - avanzamento, velocità e tempo stimato;
 - annullamento del download;

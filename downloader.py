@@ -30,6 +30,8 @@ class DownloadEvent:
     title: str = ""
     speed: str = ""
     eta: str = ""
+    item_index: int | None = None
+    item_count: int | None = None
 
 
 QUALITY_BITRATES = {
@@ -62,10 +64,18 @@ class AudioDownloader:
         quality: str,
         cancel: threading.Event,
         allow_alternative: bool,
+        allow_playlist: bool,
     ) -> DownloadResult:
         output_folder.mkdir(parents=True, exist_ok=True)
-        result, title = self._attempt(source, output_folder, quality, cancel)
-        if result is not DownloadResult.FAILED or not allow_alternative or not title:
+        result, title, is_playlist = self._attempt(
+            source, output_folder, quality, cancel, allow_playlist
+        )
+        if (
+            result is not DownloadResult.FAILED
+            or not allow_alternative
+            or not title
+            or is_playlist
+        ):
             return result
 
         self.emit(DownloadEvent("log", f"Cerco una possibile alternativa per “{title}”…"))
@@ -73,19 +83,28 @@ class AudioDownloader:
         if not alternative or alternative == source:
             return DownloadResult.FAILED
         self.emit(DownloadEvent("log", "Trovata un’alternativa: eseguo un solo nuovo tentativo."))
-        return self._attempt(alternative, output_folder, quality, cancel)[0]
+        return self._attempt(alternative, output_folder, quality, cancel, False)[0]
 
     def _attempt(
-        self, source: str, output_folder: Path, quality: str, cancel: threading.Event
-    ) -> tuple[DownloadResult, str]:
+        self,
+        source: str,
+        output_folder: Path,
+        quality: str,
+        cancel: threading.Event,
+        allow_playlist: bool,
+    ) -> tuple[DownloadResult, str, bool]:
         title = ""
+        is_playlist = False
 
         def hook(data: dict) -> None:
-            nonlocal title
+            nonlocal title, is_playlist
             if cancel.is_set():
                 raise DownloadCancelled()
             info = data.get("info_dict") or {}
             title = str(info.get("title") or title)
+            item_index = info.get("playlist_index")
+            item_count = info.get("n_entries") or info.get("playlist_count")
+            is_playlist = is_playlist or item_index is not None
             status = data.get("status")
             if status == "downloading":
                 self.emit(
@@ -95,16 +114,19 @@ class AudioDownloader:
                         title=title,
                         speed=str(data.get("_speed_str", "")),
                         eta=str(data.get("_eta_str", "")),
+                        item_index=int(item_index) if item_index is not None else None,
+                        item_count=int(item_count) if item_count is not None else None,
                     )
                 )
             elif status == "finished":
-                self.emit(DownloadEvent("phase", "Conversione in MP3…", title=title))
+                prefix = self._item_prefix(item_index, item_count)
+                self.emit(DownloadEvent("phase", f"{prefix}Conversione in MP3…", title=title))
 
         options = {
             "format": "bestaudio/best",
             "outtmpl": str(output_folder / "%(title).180B [%(id)s].%(ext)s"),
             "ffmpeg_location": str(self.ffmpeg_path),
-            "noplaylist": True,
+            "noplaylist": not allow_playlist,
             "windowsfilenames": True,
             "overwrites": False,
             "quiet": True,
@@ -121,14 +143,20 @@ class AudioDownloader:
             with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.extract_info(source, download=True)
                 title = str((info or {}).get("title") or title)
-            return DownloadResult.SUCCESS, title
+            return DownloadResult.SUCCESS, title, is_playlist
         except DownloadCancelled:
-            return DownloadResult.CANCELLED, title
+            return DownloadResult.CANCELLED, title, is_playlist
         except Exception as exc:
             if cancel.is_set():
-                return DownloadResult.CANCELLED, title
+                return DownloadResult.CANCELLED, title, is_playlist
             self.emit(DownloadEvent("log", f"Download non riuscito: {exc}"))
-            return DownloadResult.FAILED, title
+            return DownloadResult.FAILED, title, is_playlist
+
+    @staticmethod
+    def _item_prefix(index: object, count: object) -> str:
+        if index is None:
+            return ""
+        return f"Traccia {index}/{count} · " if count is not None else f"Traccia {index} · "
 
     def _find_alternative(self, title: str, cancel: threading.Event) -> str | None:
         if cancel.is_set():

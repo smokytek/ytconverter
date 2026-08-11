@@ -18,6 +18,7 @@ def app_data_dir() -> Path:
 class AppConfig:
     create_zip: bool = False
     allow_alternatives: bool = True
+    allow_playlists: bool = True
     quality: str = "Alta · 256 kbps"
     output_folder: str = str(Path.home() / "Downloads" / APP_NAME)
 

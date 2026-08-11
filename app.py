@@ -40,9 +40,9 @@ class YTConverterApp(tk.Tk):
         outer = ttk.Frame(self, padding=24)
         outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="ytconverter", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text="Scarica e converti una traccia audio in MP3.", style="Muted.TLabel").pack(anchor="w", pady=(2, 20))
+        ttk.Label(outer, text="Scarica video e playlist convertendoli in MP3.", style="Muted.TLabel").pack(anchor="w", pady=(2, 20))
 
-        ttk.Label(outer, text="Indirizzo del video").pack(anchor="w")
+        ttk.Label(outer, text="Indirizzo del video o della playlist").pack(anchor="w")
         url_row = ttk.Frame(outer)
         url_row.pack(fill="x", pady=(5, 14))
         self.url_var = tk.StringVar()
@@ -64,8 +64,10 @@ class YTConverterApp(tk.Tk):
         ttk.Combobox(settings, textvariable=self.quality_var, values=list(QUALITY_BITRATES), state="readonly", width=23).grid(row=1, column=0, sticky="w", pady=(5, 0))
         self.zip_var = tk.BooleanVar(value=self.config_data.create_zip)
         self.alt_var = tk.BooleanVar(value=self.config_data.allow_alternatives)
+        self.playlist_var = tk.BooleanVar(value=self.config_data.allow_playlists)
         ttk.Checkbutton(settings, text="Crea uno ZIP al termine", variable=self.zip_var).grid(row=1, column=1, sticky="w", padx=(28, 0))
         ttk.Checkbutton(settings, text="Prova un’alternativa se necessario", variable=self.alt_var).grid(row=2, column=1, sticky="w", padx=(28, 0), pady=(6, 0))
+        ttk.Checkbutton(settings, text="Consenti il download di playlist", variable=self.playlist_var).grid(row=3, column=1, sticky="w", padx=(28, 0), pady=(6, 0))
 
         ttk.Separator(outer).pack(fill="x", pady=20)
         self.status_var = tk.StringVar(value="Pronto")
@@ -134,7 +136,13 @@ class YTConverterApp(tk.Tk):
             messagebox.showerror("Cartella non disponibile", str(exc))
             return
 
-        self.config_data = AppConfig(self.zip_var.get(), self.alt_var.get(), self.quality_var.get(), str(destination))
+        self.config_data = AppConfig(
+            create_zip=self.zip_var.get(),
+            allow_alternatives=self.alt_var.get(),
+            allow_playlists=self.playlist_var.get(),
+            quality=self.quality_var.get(),
+            output_folder=str(destination),
+        )
         try:
             self.store.save(self.config_data)
         except OSError as exc:
@@ -165,6 +173,7 @@ class YTConverterApp(tk.Tk):
             config.quality,
             self.cancel_event,
             config.allow_alternatives,
+            config.allow_playlists,
         )
         created = set(destination.iterdir()) - before
         if result is DownloadResult.SUCCESS and config.create_zip and created:
@@ -190,7 +199,10 @@ class YTConverterApp(tk.Tk):
                     self.progress.configure(mode="determinate")
                     if event.percent is not None:
                         self.progress["value"] = event.percent
-                    self.status_var.set(event.title or "Download in corso…")
+                    prefix = ""
+                    if event.item_index is not None:
+                        prefix = f"[{event.item_index}/{event.item_count}] " if event.item_count else f"[{event.item_index}] "
+                    self.status_var.set(prefix + (event.title or "Download in corso…"))
                     bits = [part for part in (event.speed, f"ETA {event.eta}" if event.eta else "") if part]
                     self.detail_var.set(" · ".join(bits))
                 elif event.kind == "phase":
@@ -214,7 +226,7 @@ class YTConverterApp(tk.Tk):
         if result is DownloadResult.SUCCESS:
             self.progress["value"] = 100
             self.status_var.set("Download completato")
-            self.detail_var.set("Il file MP3 è pronto nella cartella scelta.")
+            self.detail_var.set("I file MP3 sono pronti nella cartella scelta.")
         elif result is DownloadResult.CANCELLED:
             self.progress["value"] = 0
             self.status_var.set("Download annullato")
