@@ -3,7 +3,7 @@
 a = Analysis(
     ["app.py"],
     pathex=[],
-    binaries=[],
+    binaries=[("dependencies/ffmpeg.exe", "dependencies")],
     datas=[],
     hiddenimports=[],
     hookspath=[],
@@ -28,4 +28,5 @@ exe = EXE(
     upx=True,
     console=False,
     disable_windowed_traceback=False,
+    icon=["icona.ico"],
 )

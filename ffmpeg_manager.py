@@ -14,10 +14,14 @@ def application_dir() -> Path:
 
 
 def find_ffmpeg() -> Path | None:
-    candidates = [
+    candidates: list[Path] = []
+    bundle_dir = getattr(sys, "_MEIPASS", None)
+    if bundle_dir:
+        candidates.append(Path(bundle_dir) / "dependencies" / "ffmpeg.exe")
+    candidates.extend([
         application_dir() / "dependencies" / "ffmpeg.exe",
         application_dir() / "ffmpeg.exe",
-    ]
+    ])
     system = shutil.which("ffmpeg")
     if system:
         candidates.append(Path(system))

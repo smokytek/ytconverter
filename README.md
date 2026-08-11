@@ -42,7 +42,7 @@ python bot.py
 pyinstaller --clean ytconverter.spec
 ```
 
-Copia quindi `dependencies/ffmpeg.exe` accanto all'eseguibile generato, conservando la stessa struttura di cartelle.
+La configurazione genera un singolo `ytconverter.exe` senza finestra del terminale e include il file `dependencies/ffmpeg.exe` nell'eseguibile.
 
 ## Utilizzo responsabile
 
