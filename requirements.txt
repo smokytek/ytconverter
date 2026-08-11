@@ -1,2 +1,2 @@
-yt-dlp
-ffmpeg
+yt-dlp>=2025.1
+pyinstaller>=6.0,<7

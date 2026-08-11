@@ -1,44 +1,53 @@
-# MP3 DL
+# ytconverter
 
-MP3 DL è uno script Python che permette di scaricare video da YouTube e convertirli in MP3. Supporta sia il download di singoli video che di intere playlist.
+Applicazione desktop per Windows che scarica una singola traccia audio e la converte in MP3 tramite `yt-dlp` e FFmpeg.
 
-## 📥 Installazione
+## Funzionalità
 
-1. **Clona il repository**
-   ```sh
-   git clone https://github.com/smokytek/ytconverter.git
-   cd smokytek-ytconverter
-   ```
+- interfaccia grafica Tkinter;
+- download di singoli video o playlist complete;
+- qualità MP3 selezionabile da 96 a 320 kbps;
+- avanzamento, velocità e tempo stimato;
+- annullamento del download;
+- scelta della cartella di destinazione;
+- tentativo alternativo opzionale;
+- archivio ZIP opzionale dei file creati nella sessione;
+- preferenze salvate in `%LOCALAPPDATA%\ytconverter`.
 
-2. **Installa le dipendenze**
-   ```sh
-   pip install -r requirements.txt
-   ```
+## Installazione
 
-3. **Configura le impostazioni**
-   Il file `config.json` viene generato automaticamente al primo avvio. Puoi modificarlo per attivare o disattivare alcune funzionalità:
-   ```json
-   {
-       "create_zip": true,          // Se true, comprime i file scaricati in un archivio zip
-       "allow_single_video": true,  // Se true, consente il download di singoli video
-       "allow_playlist": true       // Se true, consente il download di intere playlist
-   }
-   ```
+```powershell
+git clone https://github.com/smokytek/ytconverter.git
+cd ytconverter
+python -m pip install -r requirements.txt
+```
 
-## 🚀 Utilizzo
+Installa FFmpeg nel `PATH`, oppure copia `ffmpeg.exe` in `dependencies/ffmpeg.exe`.
 
-1. **Esegui lo script**
-   ```sh
-   python bot.py
-   ```
-2. **Inserisci l'URL** quando richiesto.
-3. Attendi il completamento del download e della conversione in MP3.
-4. Se abilitata, verrà creata un'archivio ZIP con tutti i file scaricati.
+## Avvio
 
-## ⚠ Disclaimer
+```powershell
+python app.py
+```
 
-Questo progetto è stato sviluppato solo a scopo educativo. L'autore non si assume alcuna responsabilità per l'uso improprio di questo script. Scaricare contenuti protetti da copyright senza autorizzazione è illegale. Assicurati di rispettare i termini di servizio di YouTube.
+Per compatibilità è possibile utilizzare anche:
 
-## 📜 Licenza
-Questo progetto è distribuito sotto licenza MIT.
+```powershell
+python bot.py
+```
 
+## Creazione dell'eseguibile
+
+```powershell
+pyinstaller --clean ytconverter.spec
+```
+
+La configurazione genera un singolo `ytconverter.exe` senza finestra del terminale e include il file `dependencies/ffmpeg.exe` nell'eseguibile.
+
+## Utilizzo responsabile
+
+Scarica soltanto contenuti che sei autorizzato a utilizzare e rispetta i diritti d'autore e i termini del servizio di origine.
+
+## Licenza
+
+Questo progetto è distribuito con licenza MIT.
