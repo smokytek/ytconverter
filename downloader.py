@@ -42,6 +42,11 @@ QUALITY_BITRATES = {
 }
 
 
+def _safe_filename(name: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*]', "_", name).strip(" .") or "traccia"
+    return cleaned[:150]
+
+
 def _percent(value: str) -> float | None:
     match = re.search(r"([\d.,]+)%", value)
     if not match:
@@ -85,6 +90,29 @@ class AudioDownloader:
         self.emit(DownloadEvent("log", "Trovata un’alternativa: eseguo un solo nuovo tentativo."))
         return self._attempt(alternative, output_folder, quality, cancel, False)[0]
 
+    def download_track(
+        self,
+        query: str,
+        output_folder: Path,
+        quality: str,
+        cancel: threading.Event,
+        filename: str | None = None,
+    ) -> DownloadResult:
+        """Cerca la traccia su YouTube e scarica il primo risultato."""
+        self.emit(DownloadEvent("phase", "Ricerca su YouTube…", title=query))
+        source = f"ytsearch1:{query}"
+        result, title, _ = self._attempt(
+            source, output_folder, quality, cancel, False, filename=filename
+        )
+        if result is DownloadResult.FAILED:
+            alternative = self._find_alternative(query, cancel)
+            if alternative:
+                self.emit(DownloadEvent("log", "Nuovo tentativo con un risultato diverso…"))
+                result, _, _ = self._attempt(
+                    alternative, output_folder, quality, cancel, False, filename=filename
+                )
+        return result
+
     def _attempt(
         self,
         source: str,
@@ -92,6 +120,7 @@ class AudioDownloader:
         quality: str,
         cancel: threading.Event,
         allow_playlist: bool,
+        filename: str | None = None,
     ) -> tuple[DownloadResult, str, bool]:
         title = ""
         is_playlist = False
@@ -122,9 +151,10 @@ class AudioDownloader:
                 prefix = self._item_prefix(item_index, item_count)
                 self.emit(DownloadEvent("phase", f"{prefix}Conversione in MP3…", title=title))
 
+        template = f"{_safe_filename(filename)}.%(ext)s" if filename else "%(title).180B [%(id)s].%(ext)s"
         options = {
             "format": "bestaudio/best",
-            "outtmpl": str(output_folder / "%(title).180B [%(id)s].%(ext)s"),
+            "outtmpl": str(output_folder / template),
             "ffmpeg_location": str(self.ffmpeg_path),
             "noplaylist": not allow_playlist,
             "windowsfilenames": True,

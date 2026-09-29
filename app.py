@@ -10,6 +10,9 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 from config import AppConfig, ConfigStore
 from downloader import AudioDownloader, DownloadEvent, DownloadResult, QUALITY_BITRATES
 from ffmpeg_manager import find_ffmpeg
+from spotify import SpotifyClient, SpotifyError, load_spotify_credentials
+
+SPOTIFY_PATTERN = "open.spotify.com"
 
 
 class YTConverterApp(tk.Tk):
@@ -40,7 +43,7 @@ class YTConverterApp(tk.Tk):
         outer = ttk.Frame(self, padding=24)
         outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="ytconverter", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text="Scarica video e playlist convertendoli in MP3.", style="Muted.TLabel").pack(anchor="w", pady=(2, 20))
+        ttk.Label(outer, text="Scarica video e playlist convertendoli in MP3, o importa una playlist Spotify cercando le tracce su YouTube.", style="Muted.TLabel", wraplength=650, justify="left").pack(anchor="w", pady=(2, 20))
 
         ttk.Label(outer, text="Indirizzo del video o della playlist").pack(anchor="w")
         url_row = ttk.Frame(outer)
@@ -167,14 +170,19 @@ class YTConverterApp(tk.Tk):
     ) -> None:
         before = set(destination.iterdir())
         downloader = AudioDownloader(ffmpeg, self.events.put)
-        result = downloader.download(
-            source,
-            destination,
-            config.quality,
-            self.cancel_event,
-            config.allow_alternatives,
-            config.allow_playlists,
-        )
+        if SPOTIFY_PATTERN in source:
+            result = self._run_spotify_import(
+                source, destination, config, downloader, before
+            )
+        else:
+            result = downloader.download(
+                source,
+                destination,
+                config.quality,
+                self.cancel_event,
+                config.allow_alternatives,
+                config.allow_playlists,
+            )
         created = set(destination.iterdir()) - before
         if result is DownloadResult.SUCCESS and config.create_zip and created:
             self.events.put(DownloadEvent("phase", "Creazione archivio ZIP…"))
@@ -189,6 +197,77 @@ class YTConverterApp(tk.Tk):
             except OSError as exc:
                 self.events.put(DownloadEvent("log", f"Impossibile creare lo ZIP: {exc}"))
         self.events.put(DownloadEvent("done", result.name))
+
+    def _run_spotify_import(
+        self,
+        source: str,
+        destination: Path,
+        config: AppConfig,
+        downloader: AudioDownloader,
+        before: set[Path],
+    ) -> DownloadResult:
+        client_id, client_secret = load_spotify_credentials(self.store.path)
+        client = SpotifyClient(
+            emit=lambda message: self.events.put(DownloadEvent("log", str(message))),
+            client_id=client_id,
+            client_secret=client_secret,
+            cancel=self.cancel_event,
+        )
+        try:
+            collection, tracks = client.fetch_tracks(source)
+        except SpotifyError as exc:
+            self.events.put(DownloadEvent("log", f"Spotify: {exc}"))
+            return DownloadResult.FAILED
+
+        total = len(tracks)
+        if not total:
+            self.events.put(DownloadEvent("log", "La playlist non contiene tracce."))
+            return DownloadResult.FAILED
+        self.events.put(DownloadEvent("phase", f"«{collection}» · {total} tracce da importare"))
+
+        completed = 0
+        failed: list[str] = []
+        for index, track in enumerate(tracks, start=1):
+            if self.cancel_event.is_set():
+                return DownloadResult.CANCELLED
+            if not track.name:
+                failed.append(f"traccia {index} (senza titolo)")
+                continue
+            label = f"{track.artists} - {track.name}" if track.artists else track.name
+            self.events.put(
+                DownloadEvent(
+                    "phase",
+                    f"Traccia {index}/{total} · {label}",
+                    title=f"{completed} completate · {len(failed)} non trovate",
+                )
+            )
+            filename = f"{track.artists} - {track.name}" if track.artists else track.name
+            result = downloader.download_track(
+                track.query,
+                destination,
+                config.quality,
+                self.cancel_event,
+                filename=filename,
+            )
+            if result is DownloadResult.SUCCESS:
+                completed += 1
+            elif result is DownloadResult.FAILED:
+                failed.append(label)
+                self.events.put(DownloadEvent("log", f"Non trovata su YouTube: {label}"))
+        if self.cancel_event.is_set():
+            return DownloadResult.CANCELLED
+
+        self.events.put(
+            DownloadEvent(
+                "log",
+                f"Importazione terminata: {completed}/{total} tracce scaricate"
+                + (f", {len(failed)} non trovate." if failed else "."),
+            )
+        )
+        if failed:
+            for label in failed:
+                self.events.put(DownloadEvent("log", f"  · {label}"))
+        return DownloadResult.SUCCESS if completed else DownloadResult.FAILED
 
     def _drain_events(self) -> None:
         try:
